@@ -19,20 +19,18 @@ class ModifiedGenericInstrument(GenericInstrument):
                  ip_address=None,
                  tcp_port=7777,
                  connection=None,
-                 tcp_cmd_termination='\n'
+                 serial_cmd_termination='\n'
                  ):
-
-        # Call the parent init, then fill in values specific to the 224
+        self.serial_cmd_termination = serial_cmd_termination.encode('ascii')
         super(ModifiedGenericInstrument, self).__init__(
             serial_number, com_port, baud_rate, data_bits, stop_bits, parity, flow_control, handshaking, timeout,
             ip_address, tcp_port, connection
         )
-        self.tcp_cmd_termination = tcp_cmd_termination.encode('ascii')
 
     def _usb_command(self, command):
         """Send a command over the serial USB connection"""
 
-        self.device_serial.write(command.encode('ascii') + self.tcp_cmd_termination)
+        self.device_serial.write(command.encode('ascii') + self.serial_cmd_termination)
 
     def connect_usb(self, serial_number=None, com_port=None, baud_rate=None, data_bits=None,
                     stop_bits=None, parity=None, timeout=None, handshaking=None, flow_control=None):
@@ -57,7 +55,7 @@ class ModifiedGenericInstrument(GenericInstrument):
 
                         # Send the instrument a line break, wait 100ms, and clear the input buffer so that
                         # any leftover communications from a prior session don't gum up the works
-                        self.device_serial.write(self.tcp_cmd_termination)
+                        self.device_serial.write(self.serial_cmd_termination)
                         sleep(0.1)
                         self.device_serial.reset_input_buffer()
 
