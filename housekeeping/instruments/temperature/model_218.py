@@ -1,97 +1,30 @@
-import serial
 import os
 from time import sleep
 from datetime import date, datetime
 
-from housekeeping.instruments.base.modified_generic_instrument import ModifiedGenericInstrument
+from housekeeping.instruments.temperature.base_lakeshore import BaseLakeshoreMonitor
 
 
-class Model218(ModifiedGenericInstrument):
-    # vid_pid = (1659, 8963)
-
-    def __init__(self,
-                 serial_number=None,
-                 com_port=None,
-                 baud_rate=9600,
-                 data_bits=serial.SEVENBITS,
-                 stop_bits=serial.STOPBITS_ONE,
-                 parity=serial.PARITY_ODD,
-                 flow_control=False,
-                 handshaking=False,
-                 timeout=2.0,
-                 ip_address=None,
-                 tcp_port=7777,
-                 connection=None,
-                 serial_cmd_termination='\r\n'
-                 ):
-
-        super(Model218, self).__init__(
-            serial_number, com_port, baud_rate, data_bits, stop_bits, parity, flow_control, handshaking, timeout,
-            ip_address, tcp_port, connection, serial_cmd_termination
+class Model218(BaseLakeshoreMonitor):
+    def set_date_time(self, date_time=None):
+        if date_time is not None:
+            assert isinstance(date_time, datetime)
+        else:
+            date_time = datetime.now()
+        year = '{}'.format(date_time.year)[-2:]
+        self.command(
+            'DATETIME {},{},{},{},{},{}'.format(date_time.month, date_time.day, year, date_time.hour,
+                                                date_time.minute, date_time.second)
         )
 
-    def clear_interface_command(self):
-        """Clears the bits in the Status Byte Register, Standard Event Status Register, and Operation Event Register,
-        and terminates all pending operations. Clears the interface, but not the controller."""
-
-        self.command("*CLS")
-
-    def get_standard_event_enable_mask(self):
-        """Returns the names of the standard event enable register bits and their values.
-        These values determine which bits propagate to the standard event register"""
-
-        response = self.query("*ESE?")
-        # status_register = Model218StandardEventRegister.from_integer(response)
-        return response  # TODO: parse register
-
-    def set_standard_event_enable_mask(self, register_mask):
-        """Configures values of the standard event enable register bits.
-        These values determine which bits propagate to the standard event register
-
-            Args:
-                register_mask (Model224StandardEventRegister):
-                    An StandardEventRegister class object with all bits set to a value
-
-        """
-
-        integer_representation = register_mask.to_integer()
-        self.command("*ESE " + str(integer_representation))
-
-    def get_standard_event_status_register(self):
-        """Returns the names of the standard event enable register bits and their values.
-        These values determine which bits propagate to the standard event register"""
-
-        response = self.query("*ESR?")
-        # status_register = Model218StandardEventRegister.from_integer(response)
-        return response  # TODO: parse register
-
-    def _get_identity(self):
-        return self.query('*IDN?').split(',')
-
-    def get_kelvin_reading(self, input_channel):
-        """Returns the temperature value in kelvin of either channel
-
-            Args:
-                input_channel:
-                    * Selects the channel to retrieve measurement.
-                    * Options are:
-                        * 1-8
-
-            Returns:
-                (float):
-                    The reading of the sensor in kelvin
-        """
-
-        return float(self.query("KRDG? {}".format(input_channel)))
-
-    def get_kelvin_reading_all(self):
-        """Returns the temperature value in kelvin of either channel
-
-                    Returns:
-                        (list):
-                            The reading of the sensor in kelvin
-                """
-        return [float(i) for i in (self.query("KRDG? {}".format(0))).split(',')]
+    def get_date_time(self):
+        response = self.query('DATETIME?')
+        month, day, year, hour, minute, second = [float(i) for i in response.split(',')]
+        if year > float('{}'.format(datetime.now().year)[-2:]):
+            year += 1900
+        else:
+            year += 2000
+        return datetime(year, month, day, hour, minute, second)
 
 
 if __name__ == '__main__':

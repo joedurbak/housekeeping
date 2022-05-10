@@ -1,9 +1,10 @@
 import serial
 from datetime import datetime as dt
 from time import sleep
+from collections import OrderedDict
 
 import numpy as np
-from lakeshore.generic_instrument import GenericInstrument, comports, InstrumentException
+from lakeshore.generic_instrument import InstrumentException
 
 from housekeeping.instruments.base.modified_generic_instrument import ModifiedGenericInstrument
 
