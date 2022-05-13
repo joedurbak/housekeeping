@@ -185,6 +185,13 @@ class DisplayFieldUnits(IntEnum):
     MAXIMUM_DATA = 6
 
 
+class Terminator(IntEnum):
+    CRLF = 0
+    LFCR = 1
+    LF = 2
+    NONE = 3
+
+
 class BaseLakeshoreMonitor(ModifiedGenericInstrument):
     """
     BaseLakeshoreMonitor is based on LS218S monitor
@@ -222,6 +229,7 @@ class BaseLakeshoreMonitor(ModifiedGenericInstrument):
     CurveFormat = CurveFormat
     CurveTemperatureCoefficients = CurveTemperatureCoefficients
     DisplayFieldUnits = DisplayFieldUnits
+    Terminator = Terminator
 
     def _error_check(self, error_code):
         event_register = self.EventRegister.from_integer(error_code)
@@ -324,6 +332,256 @@ class BaseLakeshoreMonitor(ModifiedGenericInstrument):
 
         self.command("*WAI")
 
+    def get_celsius_reading(self, input_channel):
+        """Returns the temperature value in celsius of either channel
+
+            Args:
+                input_channel:
+                    * Selects the channel to retrieve measurement.
+
+            Returns:
+                (float):
+                    The reading of the sensor in celsius
+        """
+
+        return float(self.query("CRDG? {}".format(input_channel)))
+
+    def get_celsius_reading_all(self):
+        """Returns the temperature value in celsius of either channel
+
+                    Returns:
+                        (list):
+                            The reading of the sensor in celsius
+                """
+        return [float(i) for i in (self.query("CRDG? {}".format(0))).split(',')]
+
+    def delete_curve(self, curve):
+        """Deletes the user curve
+
+            Args:
+                curve (int):
+                    * Specifies a user curve to delete
+
+        """
+        self.command("CRVDEL {}".format(curve))
+
+    def set_curve_header(self, curve_number, curve_header):
+        """Configures the user curve header
+
+            Args:
+                curve_number (int):
+                    * Specifies which curve to configure.
+                    * Options are:
+                        * 21 - 59
+
+                curve_header (self.CurveHeader):
+                    * A Model224CurveHeader class object containing the desired curve information
+
+        """
+        command_string = "CRVHDR {},{},{},{},{},{}".format(curve_number,
+                                                           curve_header.curve_name,
+                                                           curve_header.serial_number,
+                                                           curve_header.curve_data_format,
+                                                           curve_header.temperature_limit,
+                                                           curve_header.coefficient)
+        self.command(command_string)
+
+    def get_curve_header(self, curve):
+        """Returns parameters set on a particular user curve header
+
+            Args:
+                curve (int):
+                    * Specifies a curve to retrieve
+                    * Options are:
+                        * 21 - 59
+
+            Returns:
+                header (Model224CurveHeader):
+                    * A Model224CurveHeader class object containing the desired curve information
+
+        """
+        response = self.query("CRVHDR? {}".format(curve))
+        curve_header = response.split(",")
+        header = self.CurveHeader(str(curve_header[0]),
+                                  str(curve_header[1]),
+                                  self.CurveFormat(int(curve_header[2])),
+                                  float(curve_header[3]),
+                                  self.CurveTemperatureCoefficients(int(curve_header[4])))
+        return header
+
+    def set_curve_data_point(self, curve, index, sensor_units, temperature):
+        """Configures a user curve point
+
+            Args:
+                curve (int or str):
+                    * Specifies which curve to configure
+
+                index (int):
+                    * Specifies the points index in the curve
+
+                sensor_units (float):
+                    * Specifies sensor units for this point to 6 digits
+
+                temperature (float):
+                    * Specifies the corresponding temperature in Kelvin for this point to 6 digits
+
+        """
+        self.command("CRVPT {},{},{},{}".format(curve, index, sensor_units, temperature))
+
+    def get_curve_data_point(self, curve, index):
+        """Returns a standard or user curve data point
+
+            Args:
+                curve (int):
+                    * Specifies which curve to query
+
+                index (int):
+                    * Specifies the points index in the curve
+
+            Return:
+                curve_point (tuple)
+                    * (sensor_units: float, temp_value: float))
+
+        """
+        curve_point = self.query("CRVPT? {},{}".format(curve, index)).split(",")
+        return float(curve_point[0]), float(curve_point[1])
+
+    def set_display_field_settings(self, field, input_channel, display_units):
+        """Configures a display field in custom display mode.
+
+            Args:
+                field (int):
+                    * Specifies which display field to configure.
+                    * Options are:
+                        * 1 - 8
+
+                input_channel (int)
+                    * Defines which input to display.
+
+                display_units (self.DisplayFieldUnits)
+                    * Defines which units to display reading in.
+
+        """
+        self.command("DISPFLD {},{},{}".format(field, input_channel, display_units))
+
+    def get_display_field_settings(self, field):
+        """Returns the settings of a single display field in custom display mode.
+
+            Args:
+                field (int):
+                    * Specifies the display field to query.
+                    * Options are:
+                        * 1 - 8
+
+            Returns:
+                (dict):
+                    {input_channel: Model224InputChannel, display_units: Model224DisplayFieldUnits}
+
+        """
+        display_field_settings = self.query("DISPFLD? " + str(field))
+        separated_settings = display_field_settings.split(",")
+        return {'input_channel': int(separated_settings[0]),
+                'display_units': self.DisplayFieldUnits(int(separated_settings[1]))}
+
+    def set_filter(self, input_channel, filter_enabled, number_of_points=8, filter_reset_threshold=10):
+        """Enables or disables a filter for the readings of the specified input channel. Filter is a running
+        average that smooths input readings exponentially.
+
+            Args:
+                input_channel (str):
+                    * The input to set or disable a filter for.
+
+                filter_enabled (bool):
+                    * Enables or disables a filter for the input channel.
+                    * True for enabled, False for disabled.
+
+                number_of_points (int):
+                    * Specifies the number of points used for the filter.
+                    * Inputting a larger number of points will slow down the instrument's response to changes in
+                        temperature.
+                    * Options are:
+                        * 2 - 64
+                    * Optional if disabling the filter function.
+
+                filter_reset_threshold (int):
+                    * Specifies the limit for restarting the filter, represented by a percent of the full scale reading.
+                        If raw reading differs from filtered value by more than this threshold, filter averaging resets.
+                    * Options are:
+                        * 1% - 10%
+                    * Optional if disabling the filter function.
+
+        """
+        self.command("FILTER " + str(input_channel) + "," + str(int(filter_enabled)) + "," + str(number_of_points) +
+                     "," + str(filter_reset_threshold))
+
+    def get_filter(self, input_channel):
+        """Retrieves information about the filter set on the specified input channel.
+
+            Args:
+                input_channel (str):
+                    * The input to query for filter information.
+
+            Returns:
+                (dict):
+                    {filter_enabled: bool, number_of_points: int, filter_reset_threshold: int}
+
+        """
+        filter_information = self.query("FILTER? " + str(input_channel))
+        separated_information = filter_information.split(",")
+        return {'filter_enabled': bool(int(separated_information[0])),
+                'number_of_points': int(separated_information[1]),
+                'filter_reset_threshold': int(separated_information[2])}
+
+    def set_ieee_488(self, address, eoi_disable=False, terminator=None):
+        """Specifies the IEEE address
+
+            Args:
+                address (int):
+                    * 1-30 (0 and 31 reserved)
+                eoi_disable (bool):
+                    * Disables/enables the EOI mode. False = Enabled, True = Disabled
+                terminator (int, Terminator):
+                    * ieee termination
+        """
+        if terminator is None:
+            terminator = Terminator.CRLF
+        self.command("IEEE {},{},{}".format(terminator, int(eoi_disable), address))
+
+    def get_ieee_488(self):
+        """Returns the IEEE address set
+
+            Return:
+                address (int):
+                    * 1-30 (0 and 31 reserved)
+
+        """
+        return int(self.query("IEEE?"))
+
+    def get_kelvin_reading(self, input_channel):
+        """Returns the temperature value in kelvin of either channel
+
+            Args:
+                input_channel:
+                    * Selects the channel to retrieve measurement.
+
+            Returns:
+                (float):
+                    The reading of the sensor in kelvin
+        """
+
+        return float(self.query("KRDG? {}".format(input_channel)))
+
+    def get_kelvin_reading_all(self):
+        """Returns the temperature value in kelvin of either channel
+
+                    Returns:
+                        (list):
+                            The reading of the sensor in kelvin
+                """
+        return [float(i) for i in (self.query("KRDG? {}".format(0))).split(',')]
+
+
+class Model218Model331Overlap(BaseLakeshoreMonitor):
     def set_alarm_parameters(self, input_channel, alarm_enable, alarm_settings=None):
         """Configures the alarm parameters for an input
 
@@ -481,180 +739,6 @@ class BaseLakeshoreMonitor(ModifiedGenericInstrument):
 
     def get_baud_rate(self):
         return self.Baud(int(self.query('BAUD?')))
-
-    def get_celsius_reading(self, input_channel):
-        """Returns the temperature value in celsius of either channel
-
-            Args:
-                input_channel:
-                    * Selects the channel to retrieve measurement.
-
-            Returns:
-                (float):
-                    The reading of the sensor in celsius
-        """
-
-        return float(self.query("CRDG? {}".format(input_channel)))
-
-    def get_celsius_reading_all(self):
-        """Returns the temperature value in celsius of either channel
-
-                    Returns:
-                        (list):
-                            The reading of the sensor in celsius
-                """
-        return [float(i) for i in (self.query("CRDG? {}".format(0))).split(',')]
-
-    def delete_curve(self, curve):
-        """Deletes the user curve
-
-            Args:
-                curve (int):
-                    * Specifies a user curve to delete
-
-        """
-        self.command("CRVDEL {}".format(curve))
-
-    def set_curve_header(self, curve_number, curve_header):
-        """Configures the user curve header
-
-            Args:
-                curve_number (int):
-                    * Specifies which curve to configure.
-                    * Options are:
-                        * 21 - 59
-
-                curve_header (self.CurveHeader):
-                    * A Model224CurveHeader class object containing the desired curve information
-
-        """
-        command_string = "CRVHDR {},{},{},{},{},{}".format(curve_number,
-                                                           curve_header.curve_name,
-                                                           curve_header.serial_number,
-                                                           curve_header.curve_data_format,
-                                                           curve_header.temperature_limit,
-                                                           curve_header.coefficient)
-        self.command(command_string)
-
-    def get_curve_header(self, curve):
-        """Returns parameters set on a particular user curve header
-
-            Args:
-                curve (int):
-                    * Specifies a curve to retrieve
-                    * Options are:
-                        * 21 - 59
-
-            Returns:
-                header (Model224CurveHeader):
-                    * A Model224CurveHeader class object containing the desired curve information
-
-        """
-        response = self.query("CRVHDR? {}".format(curve))
-        curve_header = response.split(",")
-        header = self.CurveHeader(str(curve_header[0]),
-                                  str(curve_header[1]),
-                                  self.CurveFormat(int(curve_header[2])),
-                                  float(curve_header[3]),
-                                  self.CurveTemperatureCoefficients(int(curve_header[4])))
-        return header
-
-    def set_curve_data_point(self, curve, index, sensor_units, temperature):
-        """Configures a user curve point
-
-            Args:
-                curve (int or str):
-                    * Specifies which curve to configure
-
-                index (int):
-                    * Specifies the points index in the curve
-
-                sensor_units (float):
-                    * Specifies sensor units for this point to 6 digits
-
-                temperature (float):
-                    * Specifies the corresponding temperature in Kelvin for this point to 6 digits
-
-        """
-        self.command("CRVPT {},{},{},{}".format(curve, index, sensor_units, temperature))
-
-    def get_curve_data_point(self, curve, index):
-        """Returns a standard or user curve data point
-
-            Args:
-                curve (int):
-                    * Specifies which curve to query
-
-                index (int):
-                    * Specifies the points index in the curve
-
-            Return:
-                curve_point (tuple)
-                    * (sensor_units: float, temp_value: float))
-
-        """
-        curve_point = self.query("CRVPT? {},{}".format(curve, index)).split(",")
-        return float(curve_point[0]), float(curve_point[1])
-
-    def set_display_field_settings(self, field, input_channel, display_units):
-        """Configures a display field in custom display mode.
-
-            Args:
-                field (int):
-                    * Specifies which display field to configure.
-                    * Options are:
-                        * 1 - 8
-
-                input_channel (int)
-                    * Defines which input to display.
-
-                display_units (self.DisplayFieldUnits)
-                    * Defines which units to display reading in.
-
-        """
-        self.command("DISPFLD {},{},{}".format(field, input_channel, display_units))
-
-    def get_display_field_settings(self, field):
-        """Returns the settings of a single display field in custom display mode.
-
-            Args:
-                field (int):
-                    * Specifies the display field to query.
-                    * Options are:
-                        * 1 - 8
-
-            Returns:
-                (dict):
-                    {input_channel: Model224InputChannel, display_units: Model224DisplayFieldUnits}
-
-        """
-        display_field_settings = self.query("DISPFLD? " + str(field))
-        separated_settings = display_field_settings.split(",")
-        return {'input_channel': int(separated_settings[0]),
-                'display_units': self.DisplayFieldUnits(int(separated_settings[1]))}
-
-    def get_kelvin_reading(self, input_channel):
-        """Returns the temperature value in kelvin of either channel
-
-            Args:
-                input_channel:
-                    * Selects the channel to retrieve measurement.
-
-            Returns:
-                (float):
-                    The reading of the sensor in kelvin
-        """
-
-        return float(self.query("KRDG? {}".format(input_channel)))
-
-    def get_kelvin_reading_all(self):
-        """Returns the temperature value in kelvin of either channel
-
-                    Returns:
-                        (list):
-                            The reading of the sensor in kelvin
-                """
-        return [float(i) for i in (self.query("KRDG? {}".format(0))).split(',')]
 
 
 '''
@@ -820,25 +904,6 @@ class BaseLakeshoreMonitor(ModifiedGenericInstrument):
         """
 
         return int(self.query("BRIGT?"))
-
-    def set_ieee_488(self, address):
-        """Specifies the IEEE address
-
-            Args:
-                address (int):
-                    * 1-30 (0 and 31 reserved)
-        """
-        self.command("IEEE " + str(address))
-
-    def get_ieee_488(self):
-        """Returns the IEEE address set
-
-            Return:
-                address (int):
-                    * 1-30 (0 and 31 reserved)
-
-        """
-        return int(self.query("IEEE?"))
 
     def set_led_state(self, state):
         """Sets the front panel LEDs to on or off.
@@ -1078,65 +1143,7 @@ class BaseLakeshoreMonitor(ModifiedGenericInstrument):
         """
         return bool(int(self.query("RELAYST? " + str(relay_channel))))
 
-    def set_filter(self, input_channel, filter_enabled, number_of_points=8, filter_reset_threshold=10):
-        """Enables or disables a filter for the readings of the specified input channel. Filter is a running
-        average that smooths input readings exponentially.
-
-            Args:
-                input_channel (str):
-                    * The input to set or disable a filter for.
-                    * Options are:
-                        * A
-                        * B
-                        * C(1 - 5)
-                        * D(1 - 5)
-
-                filter_enabled (bool):
-                    * Enables or disables a filter for the input channel.
-                    * True for enabled, False for disabled.
-
-                number_of_points (int):
-                    * Specifies the number of points used for the filter.
-                    * Inputting a larger number of points will slow down the instrument's response to changes in
-                        temperature.
-                    * Options are:
-                        * 2 - 64
-                    * Optional if disabling the filter function.
-
-                filter_reset_threshold (int):
-                    * Specifies the limit for restarting the filter, represented by a percent of the full scale reading.
-                        If raw reading differs from filtered value by more than this threshold, filter averaging resets.
-                    * Options are:
-                        * 1% - 10%
-                    * Optional if disabling the filter function.
-
-        """
-        self.command("FILTER " + str(input_channel) + "," + str(int(filter_enabled)) + "," + str(number_of_points) +
-                     "," + str(filter_reset_threshold))
-
-    def get_filter(self, input_channel):
-        """Retrieves information about the filter set on the specified input channel.
-
-            Args:
-                input_channel (str):
-                    * The input to query for filter information.
-                    * Options are:
-                        * A
-                        * B
-                        * C(1 - 5)
-                        * D(1 - 5)
-
-            Returns:
-                (dict):
-                    {filter_enabled: bool, number_of_points: int, filter_reset_threshold: int}
-
-        """
-        filter_information = self.query("FILTER? " + str(input_channel))
-        separated_information = filter_information.split(",")
-        return {'filter_enabled': bool(int(separated_information[0])),
-                'number_of_points': int(separated_information[1]),
-                'filter_reset_threshold': int(separated_information[2])}
-
+    
     def configure_input(self, input_channel, settings):
         """Configures a sensor for measurement input readings.
 

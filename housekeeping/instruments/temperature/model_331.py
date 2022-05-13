@@ -1,10 +1,10 @@
 from time import sleep
 from datetime import date, datetime
 
-from housekeeping.instruments.temperature.base_lakeshore import BaseLakeshoreController
+from housekeeping.instruments.temperature.base_lakeshore import BaseLakeshoreController, Model218Model331Overlap
 
 
-class Model331(BaseLakeshoreController):
+class Model331(Model218Model331Overlap, BaseLakeshoreController):
     pass
 
 

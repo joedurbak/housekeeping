@@ -2,10 +2,10 @@ import os
 from time import sleep
 from datetime import date, datetime
 
-from housekeeping.instruments.temperature.base_lakeshore import BaseLakeshoreMonitor
+from housekeeping.instruments.temperature.base_lakeshore import Model218Model331Overlap
 
 
-class Model218(BaseLakeshoreMonitor):
+class Model218(Model218Model331Overlap):
     def set_date_time(self, date_time=None):
         if date_time is not None:
             assert isinstance(date_time, datetime)
@@ -40,6 +40,7 @@ if __name__ == '__main__':
         temps = monitor.get_kelvin_reading_all()
         templine = datetime.isoformat(timestamp) + '\t' + '\t'.join([str(i) for i in temps]) + '\n'
         print(templine.strip())
-        with open(save_file, 'a') as f:
-            f.write(templine)
+        print(monitor.query('IEEE?'))
+        # with open(save_file, 'a') as f:
+        #     f.write(templine)
         sleep(5)
