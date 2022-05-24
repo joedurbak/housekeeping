@@ -118,6 +118,28 @@ class InputSensorUnits(IntEnum):
     LINEAR_EQUATION = 4
 
 
+class SensorTypes(IntEnum):
+    DIODE_2_5V = 0
+    DIODE_7_5V = 1
+    PLATINUM_250_OHM = 2
+    PLATINUM_500_OHM = 3
+    PLATINUM_5000_OHM = 4
+    CERNOX = 5
+
+
+class Model325Model331SensorTypes(IntEnum):
+    SILICON_DIODE = 0
+    GaAlAs_DIODE = 1
+    PLATINUM_100_OHM_250 = 2
+    PLATINUM_100_OHM_500 = 3
+    PLATINUM_1000_OHM = 4
+    NTC_RTD = 5
+    THERMOCOUPLE_25_MV = 6
+    THERMOCOUPLE_50_MV = 7
+    _2_5V_1_MA = 8
+    _7_5V_1_MA = 9
+
+
 class AnalogMode(IntEnum):
     OFF = 0
     INPUT = 1
@@ -230,6 +252,7 @@ class BaseLakeshoreMonitor(ModifiedGenericInstrument):
     CurveTemperatureCoefficients = CurveTemperatureCoefficients
     DisplayFieldUnits = DisplayFieldUnits
     Terminator = Terminator
+    SensorTypes = SensorTypes
 
     def _error_check(self, error_code):
         event_register = self.EventRegister.from_integer(error_code)
@@ -396,8 +419,8 @@ class BaseLakeshoreMonitor(ModifiedGenericInstrument):
                         * 21 - 59
 
             Returns:
-                header (Model224CurveHeader):
-                    * A Model224CurveHeader class object containing the desired curve information
+                header (CurveHeader):
+                    * A CurveHeader class object containing the desired curve information
 
         """
         response = self.query("CRVHDR? {}".format(curve))
@@ -475,7 +498,7 @@ class BaseLakeshoreMonitor(ModifiedGenericInstrument):
 
             Returns:
                 (dict):
-                    {input_channel: Model224InputChannel, display_units: Model224DisplayFieldUnits}
+                    {input_channel: InputChannel, display_units: DisplayFieldUnits}
 
         """
         display_field_settings = self.query("DISPFLD? " + str(field))
@@ -557,6 +580,68 @@ class BaseLakeshoreMonitor(ModifiedGenericInstrument):
         """
         return int(self.query("IEEE?"))
 
+    def set_input_curve(self, input_channel, curve_number):
+        """Specifies the curve an input uses for temperature conversion
+
+            Args:
+                input_channel (str):
+                    Specifies which input to configure
+
+                curve_number (int):
+                    * 0 = none, 1-20 = standard curves, 21-59 = user curves
+
+        """
+        self.command("INCRV " + str(input_channel) + "," + str(curve_number))
+        # Check that the user mapped an input to a curve (not just set the input to no curve)
+        if curve_number != 0:
+            # Query the curve mapped to input_channel, if the query returns zero,
+            # an invalid curve was selected for the specified input
+            set_curve = self.get_input_curve(input_channel)
+            if set_curve == 0:
+                raise InstrumentException("The specified curve type does not match the configured input type")
+
+    def get_input_curve(self, input_channel):
+        """Returns the curve number being used for a given input
+
+            Args:
+                input_channel (str):
+                    Specifies which input to query
+
+            Return:
+                curve_number (int):
+                    * 0-59
+
+        """
+        return int(self.query("INCRV? " + str(input_channel)))
+
+    def set_input_type(self, input_group, sensor_type, compensation=None):
+        """
+
+        Parameters
+        ----------
+        input_group: A (1-4) or B (5-8)
+        sensor_type
+        compensation: bool or None
+
+        Returns
+        -------
+
+        """
+        if compensation is not None:
+            compensation_term = ',{}'.format(int(compensation))
+        else:
+            compensation_term = ''
+        self.command('INTYPE {},{}'.format(input_group, sensor_type) + compensation_term)
+
+    def get_input_type(self, input_group):
+        response = self.query("INPUT? {}".format(input_group))
+        split_response = response.split(',')
+        if len(split_response) > 2:
+            compensation = bool(int(split_response[1]))
+        else:
+            compensation = None
+        return self.SensorTypes(int(split_response[0])), compensation
+
     def get_kelvin_reading(self, input_channel):
         """Returns the temperature value in kelvin of either channel
 
@@ -580,8 +665,59 @@ class BaseLakeshoreMonitor(ModifiedGenericInstrument):
                 """
         return [float(i) for i in (self.query("KRDG? {}".format(0))).split(',')]
 
+    def set_keypad_lock(self, state, code):
+        """Locks or unlocks front panel keypad (except for alarms and disabling heaters).
+
+            Args:
+                state (bool)
+                    * Sets the keypad to locked or unlocked. Options are:
+                    * False for unlocked or True for locked
+
+                code (int)
+                    * Specifies 3 digit lock-out code. Options are:
+                    * 000 - 999
+
+        """
+        self.command("LOCK " + str(int(state)) + "," + str(code))
+
+    def get_keypad_lock(self):
+        """Returns the state of the keypad lock and the lock-out code.
+
+            Return:
+                (dict):
+                    * [state: bool, code: int]
+
+        """
+        output_string = self.query("LOCK?")
+        separated_response = output_string.split(",")
+        return {'state': bool(int(separated_response[0])),
+                'code': int(separated_response[1])}
+
+    def select_interface_mode(self, interface_mode):
+        """Selects the mode for the remote interface being used.
+
+            Args:
+                interface_mode (Model224InterfaceMode):
+                    Object of enum type Model224InterfaceMode representing the desired communication mode.
+
+        """
+        self.command("MODE {}".format(interface_mode))
+
+    def get_interface_mode(self):
+        """Returns the mode of the remote interface.
+
+            Returns:
+                (Model224InterfaceMode):
+                    Object of enum type Model224InterfaceMode representing the communication mode.
+
+        """
+        mode_number = int(self.query("MODE?"))
+        return Model224InterfaceMode(mode_number)
+
 
 class Model218Model331Overlap(BaseLakeshoreMonitor):
+    SensorTypes = Model325Model331SensorTypes
+
     def set_alarm_parameters(self, input_channel, alarm_enable, alarm_settings=None):
         """Configures the alarm parameters for an input
 
@@ -927,33 +1063,7 @@ class Model218Model331Overlap(BaseLakeshoreMonitor):
         """
         return bool(int(self.query("LEDS?")))
 
-    def set_keypad_lock(self, state, code):
-        """Locks or unlocks front panel keypad (except for alarms and disabling heaters).
 
-            Args:
-                state (bool)
-                    * Sets the keypad to locked or unlocked. Options are:
-                    * False for unlocked or True for locked
-
-                code (int)
-                    * Specifies 3 digit lock-out code. Options are:
-                    * 000 - 999
-
-        """
-        self.command("LOCK " + str(int(state)) + "," + str(code))
-
-    def get_keypad_lock(self):
-        """Returns the state of the keypad lock and the lock-out code.
-
-            Return:
-                (dict):
-                    * [state: bool, code: int]
-
-        """
-        output_string = self.query("LOCK?")
-        separated_response = output_string.split(",")
-        return {'state': bool(int(separated_response[0])),
-                'code': int(separated_response[1])}
 
     def get_min_max_data(self, input_channel):
         """Returns the minimum and maximum data from an input
@@ -975,39 +1085,7 @@ class Model218Model331Overlap(BaseLakeshoreMonitor):
         """Resets the minimum and maximum input data"""
         self.command("MNMXRST")
 
-    def set_input_curve(self, input_channel, curve_number):
-        """Specifies the curve an input uses for temperature conversion
-
-            Args:
-                input_channel (str):
-                    Specifies which input to configure
-
-                curve_number (int):
-                    * 0 = none, 1-20 = standard curves, 21-59 = user curves
-
-        """
-        self.command("INCRV " + str(input_channel) + "," + str(curve_number))
-        # Check that the user mapped an input to a curve (not just set the input to no curve)
-        if curve_number != 0:
-            # Query the curve mapped to input_channel, if the query returns zero,
-            # an invalid curve was selected for the specified input
-            set_curve = self.get_input_curve(input_channel)
-            if set_curve == 0:
-                raise InstrumentException("The specified curve type does not match the configured input type")
-
-    def get_input_curve(self, input_channel):
-        """Returns the curve number being used for a given input
-
-            Args:
-                input_channel (str):
-                    Specifies which input to query
-
-            Return:
-                curve_number (int):
-                    * 0-59
-
-        """
-        return int(self.query("INCRV? " + str(input_channel)))
+    
 
     def set_website_login(self, username, password):
         """Sets the username and password to connect instrument to website.
@@ -1239,26 +1317,7 @@ class Model218Model331Overlap(BaseLakeshoreMonitor):
         interface_number = int(self.query("INTSEL?"))
         return Model224RemoteInterface(interface_number)
 
-    def select_interface_mode(self, interface_mode):
-        """Selects the mode for the remote interface being used.
 
-            Args:
-                interface_mode (Model224InterfaceMode):
-                    Object of enum type Model224InterfaceMode representing the desired communication mode.
-
-        """
-        self.command("MODE {}".format(interface_mode))
-
-    def get_interface_mode(self):
-        """Returns the mode of the remote interface.
-
-            Returns:
-                (Model224InterfaceMode):
-                    Object of enum type Model224InterfaceMode representing the communication mode.
-
-        """
-        mode_number = int(self.query("MODE?"))
-        return Model224InterfaceMode(mode_number)
 
 
 

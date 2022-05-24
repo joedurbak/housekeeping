@@ -26,6 +26,13 @@ class Model218(Model218Model331Overlap):
             year += 2000
         return datetime(year, month, day, hour, minute, second)
 
+    def set_input_control(self, temperature_input, enable=True):
+        self.command('INPUT {},{}'.format(temperature_input, int(enable)))
+
+    def get_input_control(self, temperature_input):
+        response = self.query('INPUT? {}'.format(temperature_input))
+        return bool(int(response))
+
 
 if __name__ == '__main__':
     monitor = Model218(com_port='COM10')
