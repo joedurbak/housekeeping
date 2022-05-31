@@ -1,29 +1,70 @@
 import serial
 import os
+from time import sleep
+from datetime import date, datetime
+
+from housekeeping.instruments.base.modified_generic_instrument import ModifiedGenericInstrument
 
 
-class Lesker392(serial.Serial):
+class Lesker392(ModifiedGenericInstrument):
     def __init__(self,
-                 port=None,
-                 baudrate=19200,
-                 bytesize=serial.EIGHTBITS,
+                 serial_number=None,
+                 com_port=None,
+                 baud_rate=19200,
+                 data_bits=serial.EIGHTBITS,
+                 stop_bits=serial.STOPBITS_ONE,
                  parity=serial.PARITY_NONE,
-                 stopbits=serial.STOPBITS_ONE,
-                 timeout=None,
-                 xonxoff=False,
-                 rtscts=False,
-                 write_timeout=None,
-                 dsrdtr=False,
-                 inter_byte_timeout=None,
-                 exclusive=None,
-                 **kwargs):
+                 flow_control=False,
+                 handshaking=False,
+                 timeout=2.0,
+                 ip_address=None,
+                 tcp_port=7777,
+                 connection=None,
+                 serial_cmd_termination='\r'):
         super(Lesker392, self).__init__(
-            port, baudrate, bytesize, parity, stopbits, timeout, xonxoff, rtscts, write_timeout, dsrdtr,
-            inter_byte_timeout, exclusive, **kwargs
+            serial_number=serial_number,
+            com_port=com_port,
+            baud_rate=baud_rate,
+            data_bits=data_bits,
+            stop_bits=stop_bits,
+            parity=parity,
+            flow_control=flow_control,
+            handshaking=handshaking,
+            timeout=timeout,
+            ip_address=ip_address,
+            tcp_port=tcp_port,
+            connection=connection,
+            serial_cmd_termination=serial_cmd_termination
         )
+
+    def _get_identity(self):
+        serial_number = 'xxxx'
+        model_number = 'xxxx'
+        serial_string = 'xxxx/xxxx'
+        firmware_version = 'xxxx'
+        return serial_number, model_number, serial_string, firmware_version
+
+    def get_pressure(self):
+        response = self.query('#01RD')
+        return float(response.split()[-1])
 
 
 if __name__ == '__main__':
-    lesker = Lesker392(port='COM14')
-    lesker.write(str.encode('#01RD', encoding='ascii') + b'\r\n')
-    print(lesker.readline())
+    lesker = Lesker392(com_port='COM14')
+    # sleep(2)
+    print(lesker.get_pressure())
+    save_file = date.isoformat(date.today()) + '.tsv'
+    header = 'timestamp\t' + '\t'.join(['temp{}'.format(i) for i in range(1, 9)]) + '\t' +\
+             '\t'.join(('mod331chanA',)) + '\t' + '\t'.join(('mod325chanA',)) + '\n'
+    if not os.path.isfile(save_file):
+        with open(save_file, 'w') as f:
+            f.write(header)
+    while True:
+        timestamp = datetime.now()
+        pressure = lesker.get_pressure()
+        writeline = datetime.isoformat(timestamp) + '\t' + str(pressure) + '\n'
+        print(writeline.strip())
+        # print(monitor.query('IEEE?'))
+        with open(save_file, 'a') as f:
+            f.write(writeline)
+        sleep(5)

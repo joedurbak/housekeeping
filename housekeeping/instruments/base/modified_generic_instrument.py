@@ -32,6 +32,20 @@ class ModifiedGenericInstrument(GenericInstrument):
 
         self.device_serial.write(command.encode('ascii') + self.serial_cmd_termination)
 
+    def _usb_query(self, query):
+        """Query over the serial USB connection"""
+
+        self._usb_command(query)
+        # sleep(1)
+        # response = self.device_serial.read(5)
+        response = self.device_serial.read_until(self.serial_cmd_termination).decode('ascii')
+
+        # If nothing is returned, raise a timeout error.
+        if not response:
+            raise InstrumentException("Communication timed out")
+
+        return response.rstrip()
+
     def connect_usb(self, serial_number=None, com_port=None, baud_rate=None, data_bits=None,
                     stop_bits=None, parity=None, timeout=None, handshaking=None, flow_control=None):
         """Establish a serial USB connection"""
