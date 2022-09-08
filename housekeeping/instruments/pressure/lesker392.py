@@ -37,16 +37,14 @@ class Lesker392(ModifiedGenericInstrument):
             serial_cmd_termination=serial_cmd_termination
         )
 
-    def _get_identity(self):
-        serial_number = 'xxxx'
-        model_number = 'xxxx'
-        serial_string = 'xxxx/xxxx'
-        firmware_version = 'xxxx'
-        return serial_number, model_number, serial_string, firmware_version
-
     def get_pressure(self):
         response = self.query('#01RD')
         return float(response.split()[-1])
+
+    def log_dict(self):
+        _dict = {}
+        prefix = self.__class__.__name__
+        _dict["{}_pressure_mBar".format(prefix)] = self.get_pressure()  # TODO: generalize for external gauge connection
 
 
 if __name__ == '__main__':

@@ -254,6 +254,9 @@ class BaseLakeshoreMonitor(ModifiedGenericInstrument):
     Terminator = Terminator
     SensorTypes = SensorTypes
 
+    def _get_identity(self):
+        return self.query('*IDN?').split(',')
+
     def _error_check(self, error_code):
         event_register = self.EventRegister.from_integer(error_code)
         if event_register.query_error:

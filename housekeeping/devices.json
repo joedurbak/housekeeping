@@ -1,0 +1,56 @@
+{
+  "Pressure": {
+    "PfeifferDualGauge": [
+      {
+        "serial_number": "AL032OADA"
+      }
+    ],
+    "Lesker392": [
+      {
+        "serial_number": "FT58MCQ8A"
+      }
+    ]
+  },
+  "TemperatureMonitor": {
+    "Model218": [
+      {
+        "com_port": "COM10"
+      }
+    ]
+  },
+  "TemperatureController": {
+    "Model325": [
+      {
+        "com_port": "COM16"
+      }
+    ],
+    "Model331": [
+      {
+        "com_port": "COM4"
+      }
+    ],
+    "CryotelAVC": [
+      {
+        "com_port": "COM11"
+      },
+      {
+        "serial_number": "AI05TUXYA"
+      },
+      {
+        "serial_number": "AI05TVIMA"
+      }
+    ]
+  },
+  "MotorController": {
+    "LinearStage": [
+      {
+        "serial_number": "7553335343735161A032"
+      }
+    ],
+    "FilterWheel": [
+      {
+        "serial_number": "64932343938351607061"
+      }
+    ]
+  }
+}

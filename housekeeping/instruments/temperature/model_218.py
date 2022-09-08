@@ -33,6 +33,12 @@ class Model218(Model218Model331Overlap):
         response = self.query('INPUT? {}'.format(temperature_input))
         return bool(int(response))
 
+    def log_dict(self):
+        _dict = {}
+        prefix = self.__class__.__name__
+        for i, v in enumerate(self.get_kelvin_reading_all()):
+            _dict["{}_ch{}".format(prefix, i+1)] = v
+
 
 if __name__ == '__main__':
     monitor = Model218(com_port='COM10')

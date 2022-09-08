@@ -1,3 +1,5 @@
+import sys
+
 import serial
 from datetime import datetime as dt
 from time import sleep
@@ -102,7 +104,11 @@ class BaseMotorCom(ModifiedGenericInstrument):
             line = self.device_serial.readline()
             line = line.decode('ascii')
             response += line
-            print(line.strip())
+            line = line.strip()
+            if line:
+                print(line)
+            else:
+                sys.stdout.write('.')
             end_line = False
             for end_statement in end_statements:
                 if line.startswith(end_statement):

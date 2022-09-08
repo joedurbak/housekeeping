@@ -27,9 +27,15 @@ class ModifiedGenericInstrument(GenericInstrument):
             ip_address, tcp_port, connection
         )
 
+    def _get_identity(self):
+        serial_number = 'xxxx'
+        model_number = 'xxxx'
+        serial_string = 'xxxx/xxxx'
+        firmware_version = 'xxxx'
+        return serial_number, model_number, serial_string, firmware_version
+
     def _usb_command(self, command):
         """Send a command over the serial USB connection"""
-
         self.device_serial.write(command.encode('ascii') + self.serial_cmd_termination)
 
     def _usb_query(self, query):
@@ -80,3 +86,6 @@ class ModifiedGenericInstrument(GenericInstrument):
 
             raise InstrumentException(
                 "No serial connections found with a matching COM port and/or matching serial number")
+
+    def log_dict(self):
+        return {}
