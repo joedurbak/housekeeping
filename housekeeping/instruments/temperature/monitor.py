@@ -9,9 +9,9 @@ from housekeeping.instruments.temperature.model_331 import Model331
 
 
 if __name__ == '__main__':
-    monitor = Model218(com_port='COM10')
-    controller331 = Model331(com_port='COM16')
-    controller325 = Model325(com_port='COM4')
+    monitor = Model218(com_port='COM23')
+    controller331 = Model331(com_port='COM24')
+    controller325 = Model325(com_port='COM22')
     print(monitor.model_number)
     save_file = date.isoformat(date.today()) + '.tsv'
     header = 'timestamp\t' + '\t'.join(['temp{}'.format(i) for i in range(1, 9)]) + '\t' +\

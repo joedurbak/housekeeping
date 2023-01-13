@@ -41,6 +41,13 @@ class Lesker392(ModifiedGenericInstrument):
         response = self.query('#01RD')
         return float(response.split()[-1])
 
+    def set_ion_gauge_on(self):
+        response = self.query('#01IG1')
+        return response
+
+    def set_ion_gauge_off(self):
+        self.query("#01IG0")
+
     def log_dict(self):
         _dict = {}
         prefix = self.__class__.__name__
@@ -52,16 +59,16 @@ if __name__ == '__main__':
     # sleep(2)
     print(lesker.get_pressure())
     save_file = date.isoformat(date.today()) + '.tsv'
-    header = 'timestamp\t' + '\t'.join(['temp{}'.format(i) for i in range(1, 9)]) + '\t' +\
-             '\t'.join(('mod331chanA',)) + '\t' + '\t'.join(('mod325chanA',)) + '\n'
+    header = 'timestamp\t' + 'lesker_mbar' + '\n'
     if not os.path.isfile(save_file):
         with open(save_file, 'w') as f:
             f.write(header)
+    lesker.set_ion_gauge_on()
     while True:
         timestamp = datetime.now()
         pressure = lesker.get_pressure()
         writeline = datetime.isoformat(timestamp) + '\t' + str(pressure) + '\n'
-        print(writeline.strip())
+        print(writeline.strip()),
         # print(monitor.query('IEEE?'))
         with open(save_file, 'a') as f:
             f.write(writeline)
