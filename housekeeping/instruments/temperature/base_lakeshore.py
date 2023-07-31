@@ -3,7 +3,7 @@ from enum import IntEnum
 import serial
 
 from lakeshore.generic_instrument import InstrumentException
-from lakeshore.temperature_controllers import HeaterError, StandardEventRegister, RegisterBase
+from lakeshore.temperature_controllers import HeaterError, StandardEventRegister, RegisterBase, InterfaceMode
 
 from housekeeping.instruments.base.modified_generic_instrument import ModifiedGenericInstrument
 
@@ -253,6 +253,7 @@ class BaseLakeshoreMonitor(ModifiedGenericInstrument):
     DisplayFieldUnits = DisplayFieldUnits
     Terminator = Terminator
     SensorTypes = SensorTypes
+    InterfaceMode = InterfaceMode
 
     def _get_identity(self):
         return self.query('*IDN?').split(',')
@@ -700,22 +701,23 @@ class BaseLakeshoreMonitor(ModifiedGenericInstrument):
         """Selects the mode for the remote interface being used.
 
             Args:
-                interface_mode (Model224InterfaceMode):
-                    Object of enum type Model224InterfaceMode representing the desired communication mode.
+                interface_mode (InterfaceMode):
+                    Object of enum type InterfaceMode representing the desired communication mode.
 
         """
         self.command("MODE {}".format(interface_mode))
 
     def get_interface_mode(self):
         """Returns the mode of the remote interface.
+            0 = local, 1 = remote, 2 = remote with local lockout.
 
             Returns:
-                (Model224InterfaceMode):
-                    Object of enum type Model224InterfaceMode representing the communication mode.
+                (InterfaceMode):
+                    Object of enum type InterfaceMode representing the communication mode.
 
         """
         mode_number = int(self.query("MODE?"))
-        return Model224InterfaceMode(mode_number)
+        return self.InterfaceMode(mode_number)
 
 
 class Model218Model331Overlap(BaseLakeshoreMonitor):
@@ -1602,7 +1604,7 @@ class BaseLakeshoreController(BaseLakeshoreMonitor):
                 "rate_value": float(parameters[1])}
 
     def get_setpoint_ramp_status(self, output):
-        """"Returns whether or not the setpoint is ramping
+        """Returns whether or not the setpoint is ramping
 
             Args:
                 output (int):
@@ -1615,3 +1617,28 @@ class BaseLakeshoreController(BaseLakeshoreMonitor):
 
         """
         return bool(int(self.query("RAMPST? {}".format(output))))
+
+    def set_setpoint(self, output, setpoint_value):
+        """Sets the control setpoint
+
+            Args:
+                    output (int):
+                        * Specifies which output's control loop to query
+                    setpoint_value (float):
+                        * Specifies setpoint temperature
+
+        """
+        self.command("SETP {},{}".format(output, setpoint_value))
+
+    def get_setpoint(self, output):
+        """Returns whether or not the setpoint is ramping
+
+            Args:
+                output (int):
+                    * Specifies which output's control loop to query
+
+            Return:
+                (float):
+                    * Control setpoint value
+        """
+        return float(self.query("SETP? {}".format(output)))

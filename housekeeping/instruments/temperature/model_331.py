@@ -5,7 +5,13 @@ from housekeeping.instruments.temperature.base_lakeshore import BaseLakeshoreCon
 
 
 class Model331(Model218Model331Overlap, BaseLakeshoreController):
-    pass
+    def get_heater_output(self, output):
+        if output == 1:
+            return float(self.query('HTR?'))
+        elif output == 2:
+            return float(self.query('AOUT?'))
+        else:
+            return -999
 
 
 if __name__ == '__main__':

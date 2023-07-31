@@ -210,6 +210,21 @@ class LinearStageMotorCom(BaseMotorCom):
         self.position_steps[motor_number] = 0
 
 
+class FilterWheelMotorCom(BaseMotorCom):
+    def aux_fw_abs_move(self, position):
+        return self.absolute_move(2, position, 400, 600)
+
+    def slit_wheel_abs_move(self, position):
+        return self.absolute_move(3, position, 400, 800)
+
+    def hk_fw_abs_move(self, position):
+        self.absolute_move(1, position, 400, 160)
+
+    def yj_fw_abs_move(self, position):
+        self.absolute_move(0, position, 400, 267)
+
+
 if __name__ == '__main__':
     m = LinearStageMotorCom(serial_number='7553335343735161A032')
+    print(m.device_serial)
     m.move(0, 10)

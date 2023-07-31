@@ -63,7 +63,10 @@ if __name__ == '__main__':
     if not os.path.isfile(save_file):
         with open(save_file, 'w') as f:
             f.write(header)
+    lesker.set_ion_gauge_off()
+    sleep(5)
     lesker.set_ion_gauge_on()
+    sleep(5)
     while True:
         timestamp = datetime.now()
         pressure = lesker.get_pressure()
