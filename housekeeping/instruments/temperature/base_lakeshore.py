@@ -1561,6 +1561,7 @@ class BaseLakeshoreController(BaseLakeshoreMonitor):
 
         """
         pid_values = self.query("PID? {}".format(output))
+        print(pid_values)
         pid_values = pid_values.split(",")
         return {"gain": float(pid_values[0]),
                 "integral": float(pid_values[1]),

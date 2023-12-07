@@ -38,7 +38,7 @@ class Lesker392(ModifiedGenericInstrument):
         )
 
     def get_pressure(self):
-        response = self.query('#01RD')
+        response = self.query('#01RDS')
         return float(response.split()[-1])
 
     def set_ion_gauge_on(self):

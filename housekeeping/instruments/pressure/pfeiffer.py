@@ -50,7 +50,9 @@ class PfeifferDualGauge(ModifiedGenericInstrument):
 
     def get_pressure(self):
         response = self.query('PR1')
+        print(response)
         pressure = str(response)[5:-5]
+        pressure = str(response)[2:]
         return float(pressure)
 
 

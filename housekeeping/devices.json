@@ -14,30 +14,30 @@
   "TemperatureMonitor": {
     "Model218": [
       {
-        "com_port": "COM10"
+        "serial_number": "FT86IZRBA"
       }
     ]
   },
   "TemperatureController": {
     "Model325": [
       {
-        "com_port": "COM16"
+        "serial_number": "FT86IZRBB"
       }
     ],
     "Model331": [
       {
-        "com_port": "COM4"
+        "serial_number": "FT86IZRBC"
       }
     ],
     "CryotelAVC": [
       {
-        "com_port": "COM11"
+        "serial_number": "FT86J1KYA"
       },
       {
-        "serial_number": "AI05TUXYA"
+        "serial_number": "FT86J1KYB"
       },
       {
-        "serial_number": "AI05TVIMA"
+        "serial_number": "FT86J1KYC"
       }
     ]
   },
