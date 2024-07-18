@@ -18,8 +18,9 @@ for device_type, device_type_dict in devices.items():
 
 comport_dict = {}
 for port in comports:
+    print(port.serial_number, port.device)
     comport_dict[port.serial_number] = port.device
 
 for device_name, device_dict in devices_flattened.items():
-    port = comport_dict[device_dict['serial_number']]
+    port = comport_dict.get(device_dict.get('serial_number', ''), 'no port')
     print(device_name, port)

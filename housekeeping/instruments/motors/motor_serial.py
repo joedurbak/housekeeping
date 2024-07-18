@@ -140,7 +140,7 @@ class BaseMotorCom(ModifiedGenericInstrument):
             if line.startswith('EOR'):
                 return int(line.split(':')[-1].strip())
 
-    def move(self, motor_number,  steps, speed=100, acceleration=100, switch_move=False, buffer_time=3):
+    def move(self, motor_number, steps, speed=100, acceleration=100, switch_move=False, buffer_time=3):
         _dict = {
             'motor_number': motor_number,
             'steps': np.abs(steps),
@@ -177,7 +177,7 @@ class BaseMotorCom(ModifiedGenericInstrument):
     def absolute_move(
             self, motor_number, steps, speed=100, acceleration=100, switch_move=False, buffer_time=3
     ):
-        current_position = self.position_steps[motor_number]
+        current_position = self.position_steps.get(motor_number, 0)
         delta_steps = steps - current_position
         return self.relative_move(motor_number, delta_steps, speed, acceleration, switch_move, buffer_time)
 
@@ -211,17 +211,29 @@ class LinearStageMotorCom(BaseMotorCom):
 
 
 class FilterWheelMotorCom(BaseMotorCom):
-    def aux_fw_abs_move(self, position):
-        return self.absolute_move(2, position, 400, 600)
-
-    def slit_wheel_abs_move(self, position):
-        return self.absolute_move(3, position, 400, 800)
+    def yj_fw_abs_move(self, position):
+        self.absolute_move(0, position, 400, 267)
 
     def hk_fw_abs_move(self, position):
         self.absolute_move(1, position, 400, 160)
 
-    def yj_fw_abs_move(self, position):
-        self.absolute_move(0, position, 400, 267)
+    def aux_fw_abs_move(self, position):
+        return self.absolute_move(2, position, 400, 660)
+
+    def slit_wheel_abs_move(self, position):
+        return self.absolute_move(3, position, 400, 800)
+
+    def yj_fw_rel_move(self, position):
+        self.relative_move(0, position, 400, 267)
+
+    def hk_fw_rel_move(self, position):
+        self.relative_move(1, position, 400, 160)
+
+    def aux_fw_rel_move(self, position):
+        return self.relative_move(2, position, 400, 660)
+
+    def slit_wheel_rel_move(self, position):
+        return self.relative_move(3, position, 400, 800)
 
 
 if __name__ == '__main__':
