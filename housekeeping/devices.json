@@ -9,6 +9,11 @@
       {
         "serial_number": "FT58MCQ8A"
       }
+    ],
+    "MKS972B": [
+      {
+        "serial_number": "B001UCFNA"
+      }
     ]
   },
   "TemperatureMonitor": {
@@ -51,6 +56,25 @@
       {
         "serial_number": "64932343938351607061"
       }
+    ]
+  },
+  "HumiditySensor": {
+   "HTSens": [
+      {
+        "serial_number": "F061204A"
+      },
+      {
+        "serial_number": "F061204B"
+      },
+      {
+        "serial_number": "F061204C"
+      },
+     {
+        "serial_number": "F061204D"
+      },
+     {
+       "serial_number": "B001U8Y0A"
+     }
     ]
   }
 }
