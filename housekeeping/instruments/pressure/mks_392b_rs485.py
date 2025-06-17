@@ -39,7 +39,7 @@ class MKS392BRS485(ModifiedGenericInstrument):
     def _usb_command(self, command):
         """Send a command over the serial USB connection"""
         prefix = '@{}'.format(self.address).encode()
-        suffix = '?;'.encode()
+        suffix = ';'.encode()
         self.device_serial.write(prefix + command.encode() + suffix + self.serial_cmd_termination)
 
     def _usb_query(self, query):
@@ -55,6 +55,6 @@ class MKS392BRS485(ModifiedGenericInstrument):
         return response.rstrip()
 
     def get_pressure(self):
-        return self.query('PR4')
+        return self.query('PR4?')
 
 
