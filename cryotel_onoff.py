@@ -5,19 +5,21 @@ installation:
 
 pip install argparse lakeshore
 """
-import argparse
-
 import serial
 from time import sleep
+from datetime import datetime as dt
+import os
 
-from argparse import ArgumentParser
+import argparse
 from lakeshore.generic_instrument import InstrumentException, GenericInstrument, comports
 
-cryocoolers = [
+cryocoolers = (
     "FT86J1KYA",
     "FT86J1KYB",
     "FT86J1KYC"
-]
+)
+
+pressure_gauge = "B001UCFNA"
 
 cryocooler_on_mode = ('temperature', 'temperature', 'power')
 
@@ -148,7 +150,6 @@ class CryotelAVC(ModifiedGenericInstrument):
             'TTARGET': 2,
             'VERSION': 2
         }
-
         self.error_codes = {
             '00000001': 'High Reject Temperature Error',
             '00000010': 'Low Reject Temperature Error',
@@ -157,6 +158,7 @@ class CryotelAVC(ModifiedGenericInstrument):
             '10000001': 'High Reject Temperature and Over Current Error',
             '10000010': 'Low Reject Temperature and Over Current Error',
         }
+        self.delim_order = ('Power Measured', 'Power Commanded', 'Target Temp', 'Reject Temp', 'Coldhead Temp')
 
     def _usb_query(self, query):
         """Query over the serial USB connection"""
@@ -309,6 +311,19 @@ class CryotelAVC(ModifiedGenericInstrument):
         """
         return self.cooler('OFF')
 
+    def get_status_dict(self):
+        status = self.status()
+        status_lines = status.splitlines()[1:]
+        status_parsed = [line.split('=') for line in status_lines]
+        status_dict = {k:v for k,v in status_parsed}
+        return status_dict
+
+    def get_status_delim(self, delim='\t'):
+        status = self.get_status_dict()
+        status_list = [status[key] for key in self.delim_order]
+        return delim.join(status_list) + '\n'
+
+
 
 def start_coolers(modes=cryocooler_on_mode):
     for cooler, mode in zip(cryocoolers, modes):
@@ -323,11 +338,38 @@ def stop_coolers():
             print(cryotel.stop_cryocooler())
 
 
+def get_all_cooler_status_delim(cooler_objs, delim='\t'):
+    statuses = [cooler.get_status_delim(delim) for cooler in cooler_objs]
+    return delim.join(statuses) + '\n'
+
+
+def get_cooler_log_header(cooler_objs, delim='\t'):
+    cooler_headers = [delim.join(['cryo{} '.format(i) + h for h in c.delim_order]) for i, c in enumerate(cooler_objs)]
+    return delim.join(cooler_headers)+'\n'
+
+
+def log_coolers(coolers=cryocoolers, logfile=None, delim='\t', poll_period=10):
+    cooler_objs = [CryotelAVC(serial_number=sn) for sn in coolers]
+    if logfile is None:
+        logfile = 'coolers_{}.tsv'.format(dt.today().strftime('%Y%m%d'))
+    if not os.path.exists(logfile):
+        cooler_headers = get_cooler_log_header(cooler_objs, delim)
+        print(cooler_headers.rstrip())
+        with open(logfile, 'w') as f:
+            f.write(cooler_headers)
+    while True:
+        statuses = get_all_cooler_status_delim(cooler_objs, delim)
+        print(statuses.rstrip())
+        with open(logfile, 'a') as f:
+            f.write(statuses)
+        sleep(poll_period)
+
+
 def main():
     parser = argparse.ArgumentParser(description='cryotel-on-off')
     parser.add_argument(
         'command',
-        help='command can be "start" or "stop". This will either start the configured cryocoolers or stop all of the cryocoolers'
+        help='command can be "start", "stop" or "log". This will either start the configured cryocoolers or stop all of the cryocoolers'
     )
     parser.add_argument(
         '-c','--cooler-on-mode', default=cryocooler_on_mode,
@@ -336,8 +378,10 @@ def main():
     if args.command == 'start':
         modes = args.cooler_on_mode.split(',')
         start_coolers(modes)
-    if args.command == 'stop':
+    elif args.command == 'stop':
         stop_coolers()
+    elif args.command == 'log':
+        log_coolers()
     else:
         print('unknown command')
         parser.print_help()

@@ -53,6 +53,7 @@ class CryotelAVC(ModifiedGenericInstrument):
             '10000001': 'High Reject Temperature and Over Current Error',
             '10000010': 'Low Reject Temperature and Over Current Error',
         }
+        self.delim_order = ('Power Measured', 'Power Commanded', 'Target Temp', 'Reject Temp', 'Coldhead Temp')
 
     def _usb_query(self, query):
         """Query over the serial USB connection"""
@@ -204,3 +205,15 @@ class CryotelAVC(ModifiedGenericInstrument):
         Convenience method to stop cryocooler
         """
         return self.cooler('OFF')
+
+    def get_status_dict(self):
+        status = self.status()
+        status_lines = status.splitlines()[1:]
+        status_parsed = [line.split('=') for line in status_lines]
+        status_dict = {k:v for k,v in status_parsed}
+        return status_dict
+
+    def get_status_delim(self, delim='\t'):
+        status = self.get_status_dict()
+        status_list = [status[key] for key in self.delim_order]
+        return delim.join(status_list) + '\n'
