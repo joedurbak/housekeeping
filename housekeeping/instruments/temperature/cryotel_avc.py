@@ -22,8 +22,9 @@ class CryotelAVC(ModifiedGenericInstrument):
     ):
         super(CryotelAVC, self).__init__(
             serial_number, com_port, baud_rate, data_bits, stop_bits, parity, flow_control, handshaking, timeout,
-            connection, serial_cmd_termination
+            connection=connection, serial_cmd_termination=serial_cmd_termination
         )
+        # self.serial_cmd_termination = serial_cmd_termination.encode()
         self.command_return_lines = {
             'COOLER': 2,
             'E': 4,
@@ -44,7 +45,6 @@ class CryotelAVC(ModifiedGenericInstrument):
             'TTARGET': 2,
             'VERSION': 2
         }
-
         self.error_codes = {
             '00000001': 'High Reject Temperature Error',
             '00000010': 'Low Reject Temperature Error',
@@ -55,6 +55,12 @@ class CryotelAVC(ModifiedGenericInstrument):
         }
         self.delim_order = ('Power Measured', 'Power Commanded', 'Target Temp', 'Reject Temp', 'Coldhead Temp')
 
+    # def _usb_command(self, command):
+    #     """Send a command over the serial USB connection"""
+    #     _cmd = command.encode('ascii') + self.serial_cmd_termination
+    #     print(_cmd)
+    #     self.device_serial.write(_cmd)
+
     def _usb_query(self, query):
         """Query over the serial USB connection"""
         query = query.upper()
@@ -62,10 +68,12 @@ class CryotelAVC(ModifiedGenericInstrument):
         # sleep(1)
         # response = self.device_serial.read(5)
         _cmd = query.split('=')[0].strip()
-        response = ''
-        for l in range(self.command_return_lines[_cmd]):
-            response += self.device_serial.read_until(self.serial_cmd_termination).decode('ascii') + '\n'
-
+        # response = ''
+        # for l in range(self.command_return_lines[_cmd]):
+        #     response += self.device_serial.read_until(self.serial_cmd_termination).decode('ascii') + '\n'
+        sleep(0.5)
+        response = self.device_serial.read_all().decode('ascii')
+        # print(response)
         # If nothing is returned, raise a timeout error.
         if not response:
             raise InstrumentException("Communication timed out")
@@ -198,7 +206,7 @@ class CryotelAVC(ModifiedGenericInstrument):
         command, setpoint_fn = commands[mode.upper()[0]]
         if setpoint is not None:
             setpoint_fn(setpoint)
-        return self.command(command)
+        return self.cooler(command)
 
     def stop_cryocooler(self):
         """
@@ -208,12 +216,12 @@ class CryotelAVC(ModifiedGenericInstrument):
 
     def get_status_dict(self):
         status = self.status()
-        status_lines = status.splitlines()[1:]
+        status_lines = status.splitlines()[2:]
         status_parsed = [line.split('=') for line in status_lines]
-        status_dict = {k:v for k,v in status_parsed}
+        status_dict = {k.strip(): v.strip() for k, v in status_parsed}
         return status_dict
 
     def get_status_delim(self, delim='\t'):
         status = self.get_status_dict()
         status_list = [status[key] for key in self.delim_order]
-        return delim.join(status_list) + '\n'
+        return delim.join(status_list)

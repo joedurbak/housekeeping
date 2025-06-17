@@ -15,7 +15,7 @@ from lakeshore.generic_instrument import InstrumentException, GenericInstrument,
 
 cryocoolers = (
     "FT86J1KYA",
-    "FT86J1KYB",
+    "FT86J1KYD",
     "FT86J1KYC"
 )
 
@@ -46,6 +46,7 @@ class ModifiedGenericInstrument(GenericInstrument):
             serial_number, com_port, baud_rate, data_bits, stop_bits, parity, flow_control, handshaking, timeout,
             ip_address, tcp_port, connection
         )
+        self.serial_cmd_termination = serial_cmd_termination.encode('ascii')
 
     def _get_identity(self):
         serial_number = 'xxxx'
@@ -56,7 +57,8 @@ class ModifiedGenericInstrument(GenericInstrument):
 
     def _usb_command(self, command):
         """Send a command over the serial USB connection"""
-        self.device_serial.write(command.encode('ascii') + self.serial_cmd_termination)
+        _cmd = command.encode('ascii') + self.serial_cmd_termination
+        self.device_serial.write(_cmd)
 
     def _usb_query(self, query):
         """Query over the serial USB connection"""
@@ -128,8 +130,9 @@ class CryotelAVC(ModifiedGenericInstrument):
     ):
         super(CryotelAVC, self).__init__(
             serial_number, com_port, baud_rate, data_bits, stop_bits, parity, flow_control, handshaking, timeout,
-            connection, serial_cmd_termination
+            connection=connection, serial_cmd_termination=serial_cmd_termination
         )
+        # self.serial_cmd_termination = serial_cmd_termination.encode()
         self.command_return_lines = {
             'COOLER': 2,
             'E': 4,
@@ -160,6 +163,12 @@ class CryotelAVC(ModifiedGenericInstrument):
         }
         self.delim_order = ('Power Measured', 'Power Commanded', 'Target Temp', 'Reject Temp', 'Coldhead Temp')
 
+    # def _usb_command(self, command):
+    #     """Send a command over the serial USB connection"""
+    #     _cmd = command.encode('ascii') + self.serial_cmd_termination
+    #     print(_cmd)
+    #     self.device_serial.write(_cmd)
+
     def _usb_query(self, query):
         """Query over the serial USB connection"""
         query = query.upper()
@@ -167,10 +176,12 @@ class CryotelAVC(ModifiedGenericInstrument):
         # sleep(1)
         # response = self.device_serial.read(5)
         _cmd = query.split('=')[0].strip()
-        response = ''
-        for l in range(self.command_return_lines[_cmd]):
-            response += self.device_serial.read_until(self.serial_cmd_termination).decode('ascii') + '\n'
-
+        # response = ''
+        # for l in range(self.command_return_lines[_cmd]):
+        #     response += self.device_serial.read_until(self.serial_cmd_termination).decode('ascii') + '\n'
+        sleep(0.5)
+        response = self.device_serial.read_all().decode('ascii')
+        # print(response)
         # If nothing is returned, raise a timeout error.
         if not response:
             raise InstrumentException("Communication timed out")
@@ -303,7 +314,7 @@ class CryotelAVC(ModifiedGenericInstrument):
         command, setpoint_fn = commands[mode.upper()[0]]
         if setpoint is not None:
             setpoint_fn(setpoint)
-        return self.command(command)
+        return self.cooler(command)
 
     def stop_cryocooler(self):
         """
@@ -313,15 +324,15 @@ class CryotelAVC(ModifiedGenericInstrument):
 
     def get_status_dict(self):
         status = self.status()
-        status_lines = status.splitlines()[1:]
+        status_lines = status.splitlines()[2:]
         status_parsed = [line.split('=') for line in status_lines]
-        status_dict = {k:v for k,v in status_parsed}
+        status_dict = {k.strip(): v.strip() for k, v in status_parsed}
         return status_dict
 
     def get_status_delim(self, delim='\t'):
         status = self.get_status_dict()
         status_list = [status[key] for key in self.delim_order]
-        return delim.join(status_list) + '\n'
+        return delim.join(status_list)
 
 
 
@@ -354,11 +365,13 @@ def log_coolers(coolers=cryocoolers, logfile=None, delim='\t', poll_period=10):
         logfile = 'coolers_{}.tsv'.format(dt.today().strftime('%Y%m%d'))
     if not os.path.exists(logfile):
         cooler_headers = get_cooler_log_header(cooler_objs, delim)
+        cooler_headers = 'datetime' + delim + cooler_headers
         print(cooler_headers.rstrip())
         with open(logfile, 'w') as f:
             f.write(cooler_headers)
     while True:
         statuses = get_all_cooler_status_delim(cooler_objs, delim)
+        statuses = dt.utcnow().isoformat() + delim + statuses
         print(statuses.rstrip())
         with open(logfile, 'a') as f:
             f.write(statuses)
@@ -369,16 +382,16 @@ def main():
     parser = argparse.ArgumentParser(description='cryotel-on-off')
     parser.add_argument(
         'command',
-        help='command can be "start", "stop" or "log". This will either start the configured cryocoolers or stop all of the cryocoolers'
+        help='command can be "on", "off" or "log". This will either start the configured cryocoolers or stop all of the cryocoolers'
     )
     parser.add_argument(
-        '-c','--cooler-on-mode', default=cryocooler_on_mode,
+        '-c','--cooler-on-mode', default=','.join(cryocooler_on_mode),
         help='mode to start cryocoolers in joined with a comma (,). Can be "power", "temperature" or "off". Not case-sensitive. Only the first letter for each mode matters. Default is {}'.format(','.join(cryocooler_on_mode)))
     args = parser.parse_args()
-    if args.command == 'start':
+    if args.command == 'on':
         modes = args.cooler_on_mode.split(',')
         start_coolers(modes)
-    elif args.command == 'stop':
+    elif args.command == 'off':
         stop_coolers()
     elif args.command == 'log':
         log_coolers()
