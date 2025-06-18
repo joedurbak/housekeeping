@@ -1,4 +1,5 @@
 import serial
+from time import sleep
 
 from lakeshore.generic_instrument import InstrumentException
 
@@ -132,7 +133,7 @@ class CryotelAVC(ModifiedGenericInstrument):
         return self.no_arg_command('P', argument)
 
     def pwout(self, argument=None):
-        return self.no_arg_command('PWOUT', argument)
+        return self.cryotel_command('PWOUT', argument)
 
     def power_setpoint(self, argument=None):
         """

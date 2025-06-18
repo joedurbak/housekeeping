@@ -22,6 +22,7 @@ cryocoolers = (
 pressure_gauge = "B001UCFNA"
 
 cryocooler_on_mode = ('temperature', 'temperature', 'power')
+default_setpoints = ('70', '70', '200')
 
 
 class ModifiedGenericInstrument(GenericInstrument):
@@ -240,7 +241,7 @@ class CryotelAVC(ModifiedGenericInstrument):
         return self.no_arg_command('P', argument)
 
     def pwout(self, argument=None):
-        return self.no_arg_command('PWOUT', argument)
+        return self.cryotel_command('PWOUT', argument)
 
     def power_setpoint(self, argument=None):
         """
@@ -335,12 +336,11 @@ class CryotelAVC(ModifiedGenericInstrument):
         return delim.join(status_list)
 
 
-
-def start_coolers(modes=cryocooler_on_mode):
-    for cooler, mode in zip(cryocoolers, modes):
+def start_coolers(modes=cryocooler_on_mode, setpoints=default_setpoints):
+    for cooler, mode, setpoint in zip(cryocoolers, modes, setpoints):
         if mode.upper().startswith('P') or mode.upper().startswith('T'):
             with CryotelAVC(serial_number=cooler) as cryotel:
-                print(cryotel.start_cryocooler(mode))
+                print(cryotel.start_cryocooler(mode, setpoint))
 
 
 def stop_coolers():
@@ -387,10 +387,14 @@ def main():
     parser.add_argument(
         '-c','--cooler-on-mode', default=','.join(cryocooler_on_mode),
         help='mode to start cryocoolers in joined with a comma (,). Can be "power", "temperature" or "off". Not case-sensitive. Only the first letter for each mode matters. Default is {}'.format(','.join(cryocooler_on_mode)))
+    parser.add_argument(
+        '-s', '--setpoints', default=','.join(default_setpoints),
+        help='setpoints for the cryocoolers joined with a comma (,) in either Watts for power mode, or Kelvin for temperature mode. Default is {}'.format(','.join(default_setpoints)))
     args = parser.parse_args()
     if args.command == 'on':
         modes = args.cooler_on_mode.split(',')
-        start_coolers(modes)
+        setpoints = args.setpoints.split(',')
+        start_coolers(modes, setpoints)
     elif args.command == 'off':
         stop_coolers()
     elif args.command == 'log':
